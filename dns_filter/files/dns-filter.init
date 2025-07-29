@@ -10,12 +10,19 @@ load_config() {
 	config_load dns-filter
 	
 	config_get enabled config enabled 1
+	config_get ipv6_enabled config ipv6_enabled 1
 	config_get log_blocked config log_blocked 0
 	config_get log_allowed config log_allowed 0
+	config_get log_whitelist config log_whitelist 0
 	config_get block_unknown config block_unknown 0
+	config_get whitelist_enabled config whitelist_enabled 1
+	config_get custom_response_enabled config custom_response_enabled 0
 	config_get max_domains config max_domains 10000
+	config_get custom_response_ip config custom_response_ip "0.0.0.0"
 	config_get domains_file config domains_file "/etc/dns-filter/blocked-domains.txt"
+	config_get whitelist_file config whitelist_file "/etc/dns-filter/whitelisted-domains.txt"
 	config_get auto_load_domains config auto_load_domains 1
+	config_get auto_load_whitelist config auto_load_whitelist 1
 }
 
 start_service() {
@@ -40,28 +47,54 @@ start_service() {
 		$PROG --disable
 	fi
 	
+	# Configure IPv6 support
+	$PROG --ipv6 $ipv6_enabled
+	
+	# Configure logging
 	$PROG --log-blocked $log_blocked
 	$PROG --log-allowed $log_allowed
+	$PROG --log-whitelist $log_whitelist
 	
-	# Load domains from file if auto_load_domains is enabled
-	if [ "$auto_load_domains" = "1" ] && [ -f "$domains_file" ]; then
-		logger -t dns-filter "Loading domains from $domains_file"
-		$PROG --load "$domains_file"
+	# Configure whitelist
+	$PROG --whitelist-enable $whitelist_enabled
+	
+	# Configure custom responses
+	$PROG --custom-response $custom_response_enabled
+	if [ "$custom_response_enabled" = "1" ] && [ -n "$custom_response_ip" ]; then
+		$PROG --response-ip "$custom_response_ip"
+	fi
+	
+	# Load whitelist from file if auto_load_whitelist is enabled
+	if [ "$auto_load_whitelist" = "1" ] && [ -f "$whitelist_file" ]; then
+		logger -t dns-filter "Loading whitelist from $whitelist_file"
+		$PROG --load-whitelist "$whitelist_file"
 		if [ $? -eq 0 ]; then
-			logger -t dns-filter "Successfully loaded domains from $domains_file"
+			logger -t dns-filter "Successfully loaded whitelist from $whitelist_file"
 		else
-			logger -t dns-filter "WARNING: Failed to load some domains from $domains_file"
+			logger -t dns-filter "WARNING: Failed to load some domains from whitelist $whitelist_file"
 		fi
 	fi
 	
-	logger -t dns-filter "DNS Filter service started"
+	# Load blacklist from file if auto_load_domains is enabled
+	if [ "$auto_load_domains" = "1" ] && [ -f "$domains_file" ]; then
+		logger -t dns-filter "Loading blacklist from $domains_file"
+		$PROG --load "$domains_file"
+		if [ $? -eq 0 ]; then
+			logger -t dns-filter "Successfully loaded blacklist from $domains_file"
+		else
+			logger -t dns-filter "WARNING: Failed to load some domains from blacklist $domains_file"
+		fi
+	fi
+	
+	logger -t dns-filter "DNS Filter service started (IPv4$([ "$ipv6_enabled" = "1" ] && echo "+IPv6" || echo "") support)"
 }
 
 stop_service() {
 	# Clear all domains
 	if [ -x "$PROG" ] && lsmod | grep -q dns_filter; then
-		logger -t dns-filter "Clearing blocked domains"
+		logger -t dns-filter "Clearing blocked and whitelisted domains"
 		$PROG --clear
+		$PROG --clear-whitelist
 		
 		# Disable filter
 		$PROG --disable
@@ -96,9 +129,18 @@ reload_service() {
 	fi
 	
 	# Clear existing domains and reload
+	$PROG --clear
+	$PROG --clear-whitelist
+	
+	# Reload whitelist first (so it has priority)
+	if [ "$auto_load_whitelist" = "1" ] && [ -f "$whitelist_file" ]; then
+		logger -t dns-filter "Reloading whitelist from $whitelist_file"
+		$PROG --load-whitelist "$whitelist_file"
+	fi
+	
+	# Reload blacklist
 	if [ "$auto_load_domains" = "1" ] && [ -f "$domains_file" ]; then
-		logger -t dns-filter "Reloading domains from $domains_file"
-		$PROG --clear
+		logger -t dns-filter "Reloading blacklist from $domains_file"
 		$PROG --load "$domains_file"
 	fi
 	
@@ -109,8 +151,16 @@ reload_service() {
 		$PROG --disable
 	fi
 	
+	$PROG --ipv6 $ipv6_enabled
 	$PROG --log-blocked $log_blocked
 	$PROG --log-allowed $log_allowed
+	$PROG --log-whitelist $log_whitelist
+	$PROG --whitelist-enable $whitelist_enabled
+	$PROG --custom-response $custom_response_enabled
+	
+	if [ "$custom_response_enabled" = "1" ] && [ -n "$custom_response_ip" ]; then
+		$PROG --response-ip "$custom_response_ip"
+	fi
 	
 	logger -t dns-filter "DNS Filter configuration reloaded"
 }
