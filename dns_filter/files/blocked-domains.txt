@@ -1,0 +1,31 @@
+# DNS Filter - Blocked Domains Configuration
+# 
+# Format: One domain per line
+# Comments start with #
+# Subdomains are automatically blocked (e.g., blocking example.com also blocks www.example.com)
+#
+# Example malicious and ad domains (uncomment to enable)
+
+# Malware and phishing domains
+# malware.com
+# phishing-site.net
+# fake-bank.org
+
+# Advertisement and tracking domains
+# doubleclick.net
+# googleads.com
+# googlesyndication.com
+# googleadservices.com
+# facebook.com  # Uncomment to block Facebook
+# twitter.com   # Uncomment to block Twitter
+
+# Adult content (uncomment if needed)
+# pornhub.com
+# xvideos.com
+
+# Gambling sites (uncomment if needed)
+# bet365.com
+# pokerstars.com
+
+# Add your custom blocked domains below:
+# example-blocked.com
