@@ -1,179 +1,108 @@
-# dnsmasq is Copyright (c) 2000-2022 Simon Kelley
-#
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; version 2 dated June, 1991, or
-#  (at your option) version 3 dated 29 June, 2007.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#    
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# Makefile for Site Filter - OpenWrt站点过滤模块
 
-# NOTE: Building the i18n targets requires GNU-make 
+# 编译器和编译选项
+CC = gcc
+CFLAGS = -Wall -Wextra -O2 -std=gnu99
+LDFLAGS = 
+LIBS = 
 
+# 安装路径
+PREFIX = /usr/local
+BINDIR = $(PREFIX)/bin
+SBINDIR = $(PREFIX)/sbin
+SYSCONFDIR = /etc
+INITDIR = /etc/init.d
+MANDIR = $(PREFIX)/share/man
 
-# Variables you may well want to override.
+# 源文件和目标文件
+SRCDIR = src
+SOURCES = $(SRCDIR)/site_filter.c
+HEADERS = $(SRCDIR)/site_filter.h
+TARGET = site_filter
+CONFIG = site_filter.conf
+INITSCRIPT = init.d/site_filter
 
-PREFIX        = /usr/local
-BINDIR        = $(PREFIX)/sbin
-MANDIR        = $(PREFIX)/share/man
-LOCALEDIR     = $(PREFIX)/share/locale
-BUILDDIR      = $(SRC)
-DESTDIR       = 
-CFLAGS        = -Wall -W -O2
-LDFLAGS       = 
-COPTS         = 
-RPM_OPT_FLAGS = 
-LIBS          = 
+# 构建目标
+all: $(TARGET)
 
-#################################################################
+$(TARGET): $(SOURCES) $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ $(SOURCES) $(LDFLAGS) $(LIBS)
 
-# Variables you might want to override.
+# 清理编译文件
+clean:
+	rm -f $(TARGET)
+	rm -f *.o
 
-PKG_CONFIG = pkg-config
-INSTALL    = install
-MSGMERGE   = msgmerge
-MSGFMT     = msgfmt
-XGETTEXT   = xgettext
+# 安装
+install: $(TARGET)
+	@echo "Installing Site Filter..."
+	install -d $(DESTDIR)$(SBINDIR)
+	install -m 755 $(TARGET) $(DESTDIR)$(SBINDIR)/
+	install -d $(DESTDIR)$(SYSCONFDIR)
+	install -m 644 $(CONFIG) $(DESTDIR)$(SYSCONFDIR)/
+	install -d $(DESTDIR)$(INITDIR)
+	install -m 755 $(INITSCRIPT) $(DESTDIR)$(INITDIR)/
+	@echo "Installation completed."
 
-SRC = src
-PO  = po
-MAN = man
+# 卸载
+uninstall:
+	@echo "Uninstalling Site Filter..."
+	rm -f $(DESTDIR)$(SBINDIR)/$(TARGET)
+	rm -f $(DESTDIR)$(SYSCONFDIR)/$(CONFIG)
+	rm -f $(DESTDIR)$(INITDIR)/site_filter
+	@echo "Uninstallation completed."
 
-#################################################################
+# 开发者目标
+debug: CFLAGS += -g -DDEBUG
+debug: $(TARGET)
 
-# pmake way. (NB no spaces to keep gmake 3.82 happy)
-top!=pwd
-# GNU make way.
-top?=$(CURDIR)
+# 静态分析
+check:
+	@echo "Running static analysis..."
+	@which cppcheck >/dev/null 2>&1 && cppcheck --enable=all $(SOURCES) || echo "cppcheck not found"
 
-dbus_cflags =   `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_DBUS $(PKG_CONFIG) --cflags dbus-1` 
-dbus_libs =     `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_DBUS $(PKG_CONFIG) --libs dbus-1` 
-ubus_libs =     `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_UBUS "" --copy '-lubox -lubus'`
-idn_cflags =    `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_IDN $(PKG_CONFIG) --cflags libidn` 
-idn_libs =      `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_IDN $(PKG_CONFIG) --libs libidn` 
-idn2_cflags =   `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_LIBIDN2 $(PKG_CONFIG) --cflags libidn2`
-idn2_libs =     `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_LIBIDN2 $(PKG_CONFIG) --libs libidn2`
-ct_cflags =     `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_CONNTRACK $(PKG_CONFIG) --cflags libnetfilter_conntrack`
-ct_libs =       `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_CONNTRACK $(PKG_CONFIG) --libs libnetfilter_conntrack`
-lua_cflags =    `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_LUASCRIPT $(PKG_CONFIG) --cflags lua5.2` 
-lua_libs =      `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_LUASCRIPT $(PKG_CONFIG) --libs lua5.2` 
-nettle_cflags = `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_DNSSEC     $(PKG_CONFIG) --cflags 'nettle hogweed' \
-                                                        HAVE_CRYPTOHASH $(PKG_CONFIG) --cflags nettle \
-                                                        HAVE_NETTLEHASH $(PKG_CONFIG) --cflags nettle`
-nettle_libs =   `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_DNSSEC     $(PKG_CONFIG) --libs 'nettle hogweed' \
-                                                        HAVE_CRYPTOHASH $(PKG_CONFIG) --libs nettle \
-                                                        HAVE_NETTLEHASH $(PKG_CONFIG) --libs nettle`
-gmp_libs =      `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_DNSSEC NO_GMP --copy -lgmp`
-sunos_libs =    `if uname | grep SunOS >/dev/null 2>&1; then echo -lsocket -lnsl -lposix4; fi`
-nft_cflags =    `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_NFTSET $(PKG_CONFIG) --cflags libnftables` 
-nft_libs =      `echo $(COPTS) | $(top)/bld/pkg-wrapper HAVE_NFTSET $(PKG_CONFIG) --libs libnftables`
-version =       -DVERSION='\"`$(top)/bld/get-version $(top)`\"'
+# 代码格式化
+format:
+	@echo "Formatting code..."
+	@which indent >/dev/null 2>&1 && indent -linux $(SOURCES) $(HEADERS) || echo "indent not found"
 
-sum?=$(shell $(CC) -DDNSMASQ_COMPILE_OPTS $(COPTS) -E $(top)/$(SRC)/dnsmasq.h | ( md5sum 2>/dev/null || md5 ) | cut -f 1 -d ' ')
-sum!=$(CC) -DDNSMASQ_COMPILE_OPTS $(COPTS) -E $(top)/$(SRC)/dnsmasq.h | ( md5sum 2>/dev/null || md5 ) | cut -f 1 -d ' '
-copts_conf = .copts_$(sum)
+# 测试
+test: $(TARGET)
+	@echo "Running basic tests..."
+	./$(TARGET) -h
+	@echo "Basic tests passed."
 
-objs = cache.o rfc1035.o util.o option.o forward.o network.o \
-       dnsmasq.o dhcp.o lease.o rfc2131.o netlink.o dbus.o bpf.o \
-       helper.o tftp.o log.o conntrack.o dhcp6.o rfc3315.o \
-       dhcp-common.o outpacket.o radv.o slaac.o auth.o ipset.o pattern.o \
-       domain.o dnssec.o blockdata.o tables.o loop.o inotify.o \
-       poll.o rrfilter.o edns0.o arp.o crypto.o dump.o ubus.o \
-       metrics.o hash-questions.o domain-match.o nftset.o
+# OpenWrt相关目标
+openwrt-package:
+	@echo "Creating OpenWrt package structure..."
+	mkdir -p package/site-filter/src
+	cp $(SOURCES) $(HEADERS) package/site-filter/src/
+	cp $(CONFIG) package/site-filter/
+	cp $(INITSCRIPT) package/site-filter/
+	cp openwrt/Makefile package/site-filter/
+	@echo "OpenWrt package structure created in package/site-filter/"
 
-hdrs = dnsmasq.h config.h dhcp-protocol.h dhcp6-protocol.h \
-       dns-protocol.h radv-protocol.h ip6addr.h metrics.h
+# 创建发布包
+dist: clean
+	@echo "Creating distribution package..."
+	tar czf site-filter-1.0.tar.gz $(SOURCES) $(HEADERS) $(CONFIG) $(INITSCRIPT) Makefile README.md
+	@echo "Distribution package created: site-filter-1.0.tar.gz"
 
-all : $(BUILDDIR)
-	@cd $(BUILDDIR) && $(MAKE) \
- top="$(top)" \
- build_cflags="$(version) $(dbus_cflags) $(idn2_cflags) $(idn_cflags) $(ct_cflags) $(lua_cflags) $(nettle_cflags) $(nft_cflags)" \
- build_libs="$(dbus_libs) $(idn2_libs) $(idn_libs) $(ct_libs) $(lua_libs) $(sunos_libs) $(nettle_libs) $(gmp_libs) $(ubus_libs) $(nft_libs)" \
- -f $(top)/Makefile dnsmasq 
+# 帮助信息
+help:
+	@echo "Site Filter - OpenWrt站点过滤模块"
+	@echo ""
+	@echo "可用目标:"
+	@echo "  all          - 编译程序 (默认)"
+	@echo "  clean        - 清理编译文件"
+	@echo "  install      - 安装程序和配置文件"
+	@echo "  uninstall    - 卸载程序"
+	@echo "  debug        - 编译调试版本"
+	@echo "  check        - 运行静态代码分析"
+	@echo "  format       - 格式化代码"
+	@echo "  test         - 运行基本测试"
+	@echo "  openwrt-package - 创建OpenWrt包结构"
+	@echo "  dist         - 创建发布包"
+	@echo "  help         - 显示此帮助信息"
 
-mostly_clean :
-	rm -f $(BUILDDIR)/*.mo $(BUILDDIR)/*.pot 
-	rm -f $(BUILDDIR)/.copts_* $(BUILDDIR)/*.o $(BUILDDIR)/dnsmasq.a $(BUILDDIR)/dnsmasq
-
-clean : mostly_clean
-	rm -f $(BUILDDIR)/dnsmasq_baseline
-	rm -f core */core
-	rm -f *~ contrib/*/*~ */*~
-
-install : all install-common
-
-install-common :
-	$(INSTALL) -d $(DESTDIR)$(BINDIR)
-	$(INSTALL) -d $(DESTDIR)$(MANDIR)/man8
-	$(INSTALL) -m 644 $(MAN)/dnsmasq.8 $(DESTDIR)$(MANDIR)/man8 
-	$(INSTALL) -m 755 $(BUILDDIR)/dnsmasq $(DESTDIR)$(BINDIR)
-
-all-i18n : $(BUILDDIR)
-	@cd $(BUILDDIR) && $(MAKE) \
- top="$(top)" \
- i18n=-DLOCALEDIR=\'\"$(LOCALEDIR)\"\' \
- build_cflags="$(version) $(dbus_cflags) $(idn2_cflags) $(idn_cflags) $(ct_cflags) $(lua_cflags) $(nettle_cflags) $(nft_cflags)" \
- build_libs="$(dbus_libs) $(idn2_libs) $(idn_libs) $(ct_libs) $(lua_libs) $(sunos_libs) $(nettle_libs) $(gmp_libs) $(ubus_libs) $(nft_libs)"  \
- -f $(top)/Makefile dnsmasq
-	for f in `cd $(PO); echo *.po`; do \
-		cd $(top) && cd $(BUILDDIR) && $(MAKE) top="$(top)" -f $(top)/Makefile $${f%.po}.mo; \
-	done
-
-install-i18n : all-i18n install-common
-	cd $(BUILDDIR); $(top)/bld/install-mo $(DESTDIR)$(LOCALEDIR) $(INSTALL)
-	cd $(MAN); ../bld/install-man $(DESTDIR)$(MANDIR) $(INSTALL)
-
-merge : 
-	@cd $(BUILDDIR) && $(MAKE) top="$(top)" -f $(top)/Makefile dnsmasq.pot
-	for f in `cd $(PO); echo *.po`; do \
-		echo -n msgmerge $(PO)/$$f && $(MSGMERGE) --no-wrap -U $(PO)/$$f $(BUILDDIR)/dnsmasq.pot; \
-	done
-
-# Canonicalise .po file.
-%.po : 
-	@cd $(BUILDDIR) && $(MAKE) -f $(top)/Makefile dnsmasq.pot
-	mv $(PO)/$*.po $(PO)/$*.po.orig && $(MSGMERGE) --no-wrap $(PO)/$*.po.orig $(BUILDDIR)/dnsmasq.pot >$(PO)/$*.po; 
-
-$(BUILDDIR):
-	mkdir -p $(BUILDDIR)
-
-# rules below are helpers for size tracking
-
-baseline : mostly_clean all
-	@cd $(BUILDDIR) && \
-	   mv dnsmasq dnsmasq_baseline
-
-bloatcheck : $(BUILDDIR)/dnsmasq_baseline mostly_clean all
-	@cd $(BUILDDIR) && \
-           $(top)/bld/bloat-o-meter dnsmasq_baseline dnsmasq; \
-           size dnsmasq_baseline dnsmasq
-
-# rules below are targets in recursive makes with cwd=$(BUILDDIR)
-
-$(copts_conf): $(hdrs)
-	@rm -f *.o .copts_*
-	@touch $@
-
-$(objs:.o=.c) $(hdrs):
-	ln -s $(top)/$(SRC)/$@ .
-
-$(objs): $(copts_conf) $(hdrs)
-
-.c.o:
-	$(CC) $(CFLAGS) $(COPTS) $(i18n) $(build_cflags) $(RPM_OPT_FLAGS) -c $<	
-
-dnsmasq : $(objs)
-	$(CC) $(LDFLAGS) -o $@ $(objs) $(build_libs) $(LIBS) 
-
-dnsmasq.pot : $(objs:.o=.c) $(hdrs)
-	$(XGETTEXT) -d dnsmasq --foreign-user --omit-header --keyword=_ -o $@ -i $(objs:.o=.c)
-
-%.mo : $(top)/$(PO)/%.po dnsmasq.pot
-	$(MSGMERGE) -o - $(top)/$(PO)/$*.po dnsmasq.pot | $(MSGFMT) -o $*.mo -
-
-.PHONY : all clean mostly_clean install install-common all-i18n install-i18n merge baseline bloatcheck
+.PHONY: all clean install uninstall debug check format test openwrt-package dist help
