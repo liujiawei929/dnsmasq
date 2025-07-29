@@ -1,0 +1,41 @@
+# DNS Filter - Whitelisted Domains Configuration
+# 
+# Format: One domain per line
+# Comments start with #
+# Whitelisted domains will NEVER be blocked, regardless of blacklist settings
+# Subdomains are automatically whitelisted (e.g., whitelisting google.com also whitelist www.google.com)
+#
+# Essential system and security domains (recommended to keep enabled)
+google.com
+googleapis.com
+gstatic.com
+microsoft.com
+msftconnecttest.com
+apple.com
+icloud.com
+openwrt.org
+
+# Popular CDNs and essential services
+cloudflare.com
+amazonaws.com
+azure.com
+github.com
+gitlab.com
+
+# DNS and NTP services
+1.1.1.1
+8.8.8.8
+114.114.114.114
+pool.ntp.org
+time.windows.com
+
+# Common legitimate services (uncomment if needed)
+# youtube.com
+# gmail.com
+# outlook.com
+# wikipedia.org
+# ubuntu.com
+# debian.org
+
+# Add your custom whitelisted domains below:
+# example-important.com
