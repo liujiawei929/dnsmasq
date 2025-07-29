@@ -1,0 +1,2 @@
+obj-m := dns_filter.o
+dns_filter-objs := dns_filter_main.o dns_filter_core.o

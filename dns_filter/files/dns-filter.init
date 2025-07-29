@@ -1,0 +1,116 @@
+#!/bin/sh /etc/rc.common
+
+START=95
+STOP=15
+
+USE_PROCD=1
+PROG=/usr/sbin/dns-filter-ctl
+
+load_config() {
+	config_load dns-filter
+	
+	config_get enabled config enabled 1
+	config_get log_blocked config log_blocked 0
+	config_get log_allowed config log_allowed 0
+	config_get block_unknown config block_unknown 0
+	config_get max_domains config max_domains 10000
+	config_get domains_file config domains_file "/etc/dns-filter/blocked-domains.txt"
+	config_get auto_load_domains config auto_load_domains 1
+}
+
+start_service() {
+	# Load configuration
+	load_config
+	
+	# Load kernel module
+	if ! lsmod | grep -q dns_filter; then
+		logger -t dns-filter "Loading dns_filter kernel module"
+		insmod /lib/modules/$(uname -r)/dns_filter.ko
+		if [ $? -ne 0 ]; then
+			logger -t dns-filter "ERROR: Failed to load dns_filter kernel module"
+			return 1
+		fi
+		sleep 1
+	fi
+	
+	# Configure the filter
+	if [ "$enabled" = "1" ]; then
+		$PROG --enable
+	else
+		$PROG --disable
+	fi
+	
+	$PROG --log-blocked $log_blocked
+	$PROG --log-allowed $log_allowed
+	
+	# Load domains from file if auto_load_domains is enabled
+	if [ "$auto_load_domains" = "1" ] && [ -f "$domains_file" ]; then
+		logger -t dns-filter "Loading domains from $domains_file"
+		$PROG --load "$domains_file"
+		if [ $? -eq 0 ]; then
+			logger -t dns-filter "Successfully loaded domains from $domains_file"
+		else
+			logger -t dns-filter "WARNING: Failed to load some domains from $domains_file"
+		fi
+	fi
+	
+	logger -t dns-filter "DNS Filter service started"
+}
+
+stop_service() {
+	# Clear all domains
+	if [ -x "$PROG" ] && lsmod | grep -q dns_filter; then
+		logger -t dns-filter "Clearing blocked domains"
+		$PROG --clear
+		
+		# Disable filter
+		$PROG --disable
+	fi
+	
+	# Unload kernel module
+	if lsmod | grep -q dns_filter; then
+		logger -t dns-filter "Unloading dns_filter kernel module"
+		rmmod dns_filter
+		if [ $? -eq 0 ]; then
+			logger -t dns-filter "DNS Filter service stopped"
+		else
+			logger -t dns-filter "WARNING: Failed to unload dns_filter kernel module"
+		fi
+	fi
+}
+
+restart() {
+	stop_service
+	sleep 2
+	start_service
+}
+
+reload_service() {
+	load_config
+	
+	# Only reload if module is loaded
+	if ! lsmod | grep -q dns_filter; then
+		logger -t dns-filter "Kernel module not loaded, starting service instead"
+		start_service
+		return
+	fi
+	
+	# Clear existing domains and reload
+	if [ "$auto_load_domains" = "1" ] && [ -f "$domains_file" ]; then
+		logger -t dns-filter "Reloading domains from $domains_file"
+		$PROG --clear
+		$PROG --load "$domains_file"
+	fi
+	
+	# Update configuration
+	if [ "$enabled" = "1" ]; then
+		$PROG --enable
+	else
+		$PROG --disable
+	fi
+	
+	$PROG --log-blocked $log_blocked
+	$PROG --log-allowed $log_allowed
+	
+	logger -t dns-filter "DNS Filter configuration reloaded"
+}
