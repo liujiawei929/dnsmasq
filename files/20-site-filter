@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Site filter hotplug script
+# This script handles network interface changes
+
+[ "$ACTION" = "ifup" ] || exit 0
+
+# Only handle important interfaces
+case "$INTERFACE" in
+	lan|wan|br-lan)
+		# Check if site-filter is enabled
+		. /lib/functions.sh
+		config_load site-filter
+		config_get enabled site-filter enabled 0
+		
+		if [ "$enabled" = "1" ]; then
+			# Restart site-filter service when interface comes up
+			/etc/init.d/site-filter restart &
+		fi
+		;;
+esac

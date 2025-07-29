@@ -1,0 +1,66 @@
+#!/bin/sh /etc/rc.common
+
+START=80
+STOP=15
+
+USE_PROCD=1
+PROG=/usr/sbin/site_filter
+CONF_FILE=/etc/site_filter.conf
+
+validate_section_site_filter() {
+	uci_load_validate site-filter site-filter "$1" "$2" \
+		'enabled:bool:0' \
+		'port:port:5353' \
+		'config_file:string:/etc/site_filter.conf' \
+		'debug:bool:0'
+}
+
+site_filter_instance() {
+	[ "$2" = 0 ] || {
+		echo "validation failed"
+		return 1
+	}
+
+	[ "$enabled" = 1 ] || return 1
+
+	procd_open_instance
+	procd_set_param command $PROG
+	
+	[ -n "$port" ] && procd_append_param command -p "$port"
+	[ -n "$config_file" ] && procd_append_param command -c "$config_file"
+	[ "$debug" = 1 ] && procd_append_param command -D
+	
+	procd_append_param command -d
+	procd_set_param pidfile /var/run/site_filter.pid
+	procd_set_param respawn
+	procd_set_param file "$config_file"
+	procd_close_instance
+}
+
+start_service() {
+	config_load site-filter
+	config_foreach validate_section_site_filter site-filter site_filter_instance
+}
+
+service_triggers() {
+	procd_add_reload_trigger "site-filter"
+	procd_add_validation validate_section_site_filter
+}
+
+reload_service() {
+	# Send SIGHUP to reload configuration
+	local pid_file="/var/run/site_filter.pid"
+	if [ -f "$pid_file" ]; then
+		local pid=$(cat "$pid_file")
+		if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+			kill -HUP "$pid"
+			echo "Site filter configuration reloaded"
+		else
+			echo "Site filter process not running, restarting..."
+			restart
+		fi
+	else
+		echo "PID file not found, restarting service..."
+		restart
+	fi
+}
