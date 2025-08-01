@@ -1,0 +1,49 @@
+#!/bin/sh
+# Site Filter Hotplug Script
+# 站点过滤器热插拔脚本
+# 在网络接口状态变化时触发
+
+[ "$ACTION" = ifup ] || exit 0
+
+# 只处理特定接口
+case "$INTERFACE" in
+    lan|wan|wlan*)
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+
+# 等待网络稳定
+sleep 2
+
+# 检查站点过滤器是否启用
+uci_enabled=$(uci -q get site_filter.general.enabled)
+[ "$uci_enabled" = "1" ] || exit 0
+
+# 检查服务是否运行
+if ! /etc/init.d/site_filter status >/dev/null 2>&1; then
+    logger -t site_filter "Interface $INTERFACE up, starting site filter"
+    /etc/init.d/site_filter start
+else
+    logger -t site_filter "Interface $INTERFACE up, reloading site filter config"
+    /etc/init.d/site_filter reload
+fi
+
+# 更新iptables规则（如果需要）
+# 这里可以添加防火墙规则来强制DNS流量通过站点过滤器
+
+# 获取接口IP地址
+eval $(ipcalc.sh $(uci -q get network.$INTERFACE.ipaddr) $(uci -q get network.$INTERFACE.netmask))
+
+if [ -n "$NETWORK" ] && [ -n "$PREFIX" ]; then
+    # 添加DNS重定向规则
+    iptables -t nat -D PREROUTING -i $DEVICE -p udp --dport 53 -j REDIRECT --to-port 53 2>/dev/null
+    iptables -t nat -I PREROUTING -i $DEVICE -p udp --dport 53 -j REDIRECT --to-port 53
+    
+    # 添加TCP DNS重定向（较少使用但有时需要）
+    iptables -t nat -D PREROUTING -i $DEVICE -p tcp --dport 53 -j REDIRECT --to-port 53 2>/dev/null
+    iptables -t nat -I PREROUTING -i $DEVICE -p tcp --dport 53 -j REDIRECT --to-port 53
+    
+    logger -t site_filter "DNS redirection rules added for interface $INTERFACE ($DEVICE)"
+fi

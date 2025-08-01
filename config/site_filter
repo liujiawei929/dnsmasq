@@ -1,0 +1,91 @@
+# UCI Configuration for Site Filter
+# OpenWrt站点过滤器UCI配置文件
+
+config site_filter 'general'
+	option enabled '1'
+	option dns_port '53'
+	option block_ip '0.0.0.0'
+	option log_level '6'
+	option config_file '/etc/site_filter.conf'
+
+# 示例规则配置
+# 阻止社交媒体
+config rule 'block_facebook'
+	option domain 'facebook.com'
+	option action 'block'
+
+config rule 'block_facebook_wildcard'
+	option domain '*.facebook.com'
+	option action 'block'
+
+config rule 'block_twitter'
+	option domain 'twitter.com'
+	option action 'block'
+
+config rule 'block_twitter_wildcard'
+	option domain '*.twitter.com'
+	option action 'block'
+
+# 阻止广告
+config rule 'block_doubleclick'
+	option domain '*.doubleclick.net'
+	option action 'block'
+
+config rule 'block_googlesyndication'
+	option domain '*.googlesyndication.com'
+	option action 'block'
+
+# 允许工作相关网站
+config rule 'allow_github'
+	option domain '*.github.com'
+	option action 'allow'
+
+config rule 'allow_stackoverflow'
+	option domain '*.stackoverflow.com'
+	option action 'allow'
+
+config rule 'allow_wikipedia'
+	option domain '*.wikipedia.org'
+	option action 'allow'
+
+# 重定向示例
+config rule 'redirect_internal_wiki'
+	option domain 'wiki.company.local'
+	option action 'redirect'
+	option redirect_ip '192.168.1.100'
+
+config rule 'redirect_file_server'
+	option domain 'files.company.local'
+	option action 'redirect'
+	option redirect_ip '192.168.1.101'
+
+# 阻止恶意网站
+config rule 'block_malware'
+	option domain 'malware-site.com'
+	option action 'block'
+
+config rule 'block_phishing'
+	option domain '*.phishing-domain.net'
+	option action 'block'
+
+# 家长控制
+config rule 'block_adult_content'
+	option domain '*.adult-site.com'
+	option action 'block'
+
+config rule 'block_gambling'
+	option domain '*.casino.com'
+	option action 'block'
+
+# 带宽控制 - 阻止视频流媒体
+config rule 'block_youtube'
+	option domain '*.youtube.com'
+	option action 'block'
+
+config rule 'block_netflix'
+	option domain '*.netflix.com'
+	option action 'block'
+
+config rule 'block_twitch'
+	option domain '*.twitch.tv'
+	option action 'block'
